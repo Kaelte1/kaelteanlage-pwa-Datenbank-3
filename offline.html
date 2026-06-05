@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Offline - Kreutztraeger</title>
+<meta name="theme-color" content="#1a2540">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/icon-192x192.png">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+  background:#1a2540;
+  min-height:100vh;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:24px;color:#fff;
+}
+.wrap{max-width:320px;width:100%;text-align:center}
+.brand{font-size:1rem;font-weight:800;color:#fff;margin-bottom:2px}
+.brand span{color:#0093be}
+.sub{font-size:0.62rem;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:30px}
+.icon{font-size:4rem;display:block;margin-bottom:18px;animation:spin 12s linear infinite}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+h1{font-size:1.3rem;font-weight:800;margin-bottom:9px}
+p{font-size:0.85rem;color:rgba(255,255,255,0.6);line-height:1.6;margin-bottom:24px}
+.box{
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:12px;padding:14px;margin-bottom:20px;
+}
+.row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06);
+  font-size:0.78rem;
+}
+.row:last-child{border-bottom:none}
+.lbl{color:rgba(255,255,255,0.5)}
+.val{font-weight:700}
+.ok{color:#4ade80}.warn{color:#fbbf24}
+.btns{display:flex;flex-direction:column;gap:9px}
+.btn{
+  display:block;padding:12px 20px;border-radius:25px;border:none;
+  font-size:0.88rem;font-weight:700;cursor:pointer;
+  text-decoration:none;text-align:center;transition:opacity 0.2s;
+}
+.btn:active{opacity:0.8}
+.btn-p{background:#0093be;color:#fff}
+.btn-o{background:rgba(255,255,255,0.08);color:#fff;border:1.5px solid rgba(255,255,255,0.18)}
+.pulse{
+  display:inline-block;width:7px;height:7px;
+  background:#fbbf24;border-radius:50%;
+  animation:p 1.5s infinite;margin-right:5px;vertical-align:middle;
+}
+@keyframes p{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.8)}}
+#msg{margin-top:14px;font-size:0.75rem;color:rgba(255,255,255,0.4)}
+.footer{margin-top:30px;font-size:0.68rem;color:rgba(255,255,255,0.25);line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">Kreutztraeger <span>Kaeltetechnik</span></div>
+  <div class="sub">Kaelteanlage Dashboard</div>
+  <span class="icon">&#10052;</span>
+  <h1>Keine Verbindung</h1>
+  <p>Das Dashboard ist momentan offline.<br>Bitte Internetverbindung pruefen.</p>
+  <div class="box">
+    <div class="row">
+      <span class="lbl">Internetverbindung</span>
+      <span class="val warn" id="netSt">Pruefe...</span>
+    </div>
+    <div class="row">
+      <span class="lbl">App-Cache</span>
+      <span class="val ok">Verfuegbar</span>
+    </div>
+    <div class="row">
+      <span class="lbl">Letzte Verbindung</span>
+      <span class="val" id="lastOn">Unbekannt</span>
+    </div>
+  </div>
+  <div class="btns">
+    <button class="btn btn-p" onclick="tryReconnect()">Erneut versuchen</button>
+    <a class="btn btn-o" href="index.html">Demo-Modus oeffnen</a>
+  </div>
+  <div id="msg"><span class="pulse"></span>Warte auf Verbindung...</div>
+  <div class="footer">
+    Kreutztraeger Kaeltetechnik GmbH &amp; Co. KG<br>
+    Theodor-Barth-Strasse 21 &middot; 28307 Bremen<br>
+    +49 421 43867-0
+  </div>
+</div>
+<script>
+var KEY='kt_last_online';
+var netEl=document.getElementById('netSt');
+var lstEl=document.getElementById('lastOn');
+var msgEl=document.getElementById('msg');
+
+function showLast(){
+  var s=localStorage.getItem(KEY);
+  if(s){
+    var d=new Date(parseInt(s,10));
+    lstEl.textContent=d.toLocaleString('de-DE',{
+      day:'2-digit',month:'2-digit',year:'numeric',
+      hour:'2-digit',minute:'2-digit'
+    });
+  }
+}
+
+function checkConn(){
+  if(navigator.onLine){
+    netEl.textContent='Verbunden';
+    netEl.className='val ok';
+    localStorage.setItem(KEY,Date.now().toString());
+    setTimeout(function(){window.location.href='index.html';},1000);
+  }else{
+    netEl.textContent='Offline';
+    netEl.className='val warn';
+  }
+}
+
+function tryReconnect(){
+  msgEl.innerHTML='<span class="pulse"></span>Verbindung wird geprueft...';
+  fetch('manifest.json?t='+Date.now(),{cache:'no-store'})
+    .then(function(){window.location.href='index.html';})
+    .catch(function(){
+      msgEl.innerHTML='<span class="pulse"></span>Noch offline - bitte warten...';
+    });
+}
+
+window.addEventListener('online',function(){
+  localStorage.setItem(KEY,Date.now().toString());
+  checkConn();
+});
+window.addEventListener('offline',checkConn);
+
+showLast();
+checkConn();
+setInterval(checkConn,5000);
+</script>
+</body>
+</html>
