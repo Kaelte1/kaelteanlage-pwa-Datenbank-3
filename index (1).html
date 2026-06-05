@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Kreutzträger – Kälteanlage Dashboard</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a2540">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="KT Dashboard">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ===== RESET & VARIABLEN ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue:    #1a2540;
+  --cyan:    #0093be;
+  --cyan2:   #00b4d8;
+  --bg:      #f4f6f9;
+  --white:   #ffffff;
+  --ok:      #22c55e;
+  --warn:    #f59e0b;
+  --danger:  #ef4444;
+  --gray:    #64748b;
+  --lgray:   #e2e8f0;
+  --card-bg: #ffffff;
+  --text:    #1a2540;
+  --text2:   #64748b;
+  --shadow:  0 1px 8px rgba(26,37,64,0.08);
+  --shadow2: 0 4px 20px rgba(26,37,64,0.13);
+  --r:       12px;
+  --r2:      8px;
+  --nav-h:   62px;
+  --hdr-h:   56px;
+  --safe:    env(safe-area-inset-bottom, 0px);
+}
+[data-theme="dark"] {
+  --bg:      #0d1526;
+  --white:   #162035;
+  --card-bg: #1e2d47;
+  --text:    #e2e8f0;
+  --text2:   #94a3b8;
+  --lgray:   #2a3a55;
+  --shadow:  0 1px 8px rgba(0,0,0,0.3);
+  --shadow2: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background 0.3s, color 0.3s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 2px; }
+
+/* ===== HEADER ===== */
+.hdr {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: var(--hdr-h);
+  background: var(--blue);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px;
+  z-index: 100;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+}
+.hdr-logo {
+  display: flex; align-items: center; gap: 10px;
+}
+.hdr-logo img { height: 30px; width: auto; filter: brightness(0) invert(1); }
+.hdr-logo-txt { display: flex; flex-direction: column; line-height: 1.1; }
+.hdr-logo-txt .b { font-size: 0.95rem; font-weight: 800; color: #fff; }
+.hdr-logo-txt .s { font-size: 0.6rem; font-weight: 600; color: var(--cyan2); text-transform: uppercase; letter-spacing: 1px; }
+.hdr-right { display: flex; align-items: center; gap: 10px; }
+.hdr-clock { font-size: 0.85rem; font-weight: 700; color: rgba(255,255,255,0.8); font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+.hdr-select {
+  padding: 5px 9px; border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.2);
+  font-size: 0.72rem; color: #fff; font-weight: 600;
+  background: rgba(255,255,255,0.1); cursor: pointer; outline: none;
+  max-width: 120px;
+}
+.hdr-select option { background: var(--blue); color: #fff; }
+.dark-btn {
+  width: 36px; height: 20px; background: rgba(255,255,255,0.2);
+  border-radius: 10px; cursor: pointer; position: relative;
+  border: none; transition: background 0.2s; flex-shrink: 0;
+}
+.dark-btn.on { background: var(--cyan); }
+.dark-btn::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; background: #fff;
+  border-radius: 50%; transition: left 0.2s;
+}
+.dark-btn.on::after { left: 18px; }
+
+/* ===== MAIN ===== */
+.main {
+  margin-top: var(--hdr-h);
+  padding: 14px 12px calc(var(--nav-h) + var(--safe) + 14px);
+  max-width: 860px;
+  margin-left: auto; margin-right: auto;
+}
+
+/* ===== PAGES ===== */
+.page { display: none; animation: fi 0.22s ease; }
+.page.active { display: block; }
+@keyframes fi { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+
+/* ===== SECTION TITLE ===== */
+.stitle {
+  font-size: 0.78rem; font-weight: 700; color: var(--cyan);
+  text-transform: uppercase; letter-spacing: 0.8px;
+  margin: 18px 0 10px;
+  display: flex; align-items: center; gap: 7px;
+}
+.stitle::before { content:''; display:block; width:3px; height:14px; background:var(--cyan); border-radius:2px; }
+
+/* ===== STATUS BANNER ===== */
+.banner {
+  border-radius: var(--r);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: var(--shadow);
+}
+.banner.ok   { background: linear-gradient(135deg, #166534 0%, #15803d 100%); }
+.banner.warn { background: linear-gradient(135deg, #92400e 0%, #b45309 100%); }
+.banner-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.banner-dot.ok   { background: #4ade80; animation: pg 2s infinite; }
+.banner-dot.warn { background: #fbbf24; animation: py 1.5s infinite; }
+@keyframes pg  { 0%,100%{box-shadow:0 0 0 3px rgba(74,222,128,0.3)} 50%{box-shadow:0 0 0 7px rgba(74,222,128,0.08)} }
+@keyframes py  { 0%,100%{box-shadow:0 0 0 3px rgba(251,191,36,0.3)} 50%{box-shadow:0 0 0 7px rgba(251,191,36,0.08)} }
+.banner-text { flex: 1; }
+.banner-title { font-size: 0.9rem; font-weight: 800; color: #fff; }
+.banner-sub   { font-size: 0.7rem; color: rgba(255,255,255,0.7); margin-top: 2px; }
+.banner-val   { text-align: right; }
+.banner-val-num { font-size: 1.6rem; font-weight: 900; color: #fff; line-height: 1; }
+.banner-val-lbl { font-size: 0.65rem; color: rgba(255,255,255,0.65); }
+
+/* ===== GRID ===== */
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+@media(max-width:480px) { .grid3 { grid-template-columns: 1fr 1fr; } }
+
+/* ===== METRIC CARD ===== */
+.mc {
+  background: var(--card-bg);
+  border-radius: var(--r2);
+  padding: 12px 13px;
+  box-shadow: var(--shadow);
+  border-top: 3px solid var(--cyan);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.mc:active { transform: scale(0.97); }
+.mc-label { font-size: 0.65rem; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+.mc-value { font-size: 1.45rem; font-weight: 900; color: var(--text); line-height: 1; }
+.mc-unit  { font-size: 0.68rem; color: var(--text2); margin-top: 2px; }
+.mc.ok    { border-top-color: var(--ok); }
+.mc.warn  { border-top-color: var(--warn); }
+.mc.off   { border-top-color: var(--lgray); }
+
+/* ===== BOOL CARD ===== */
+.bc {
+  background: var(--card-bg);
+  border-radius: var(--r2);
+  padding: 11px 13px;
+  box-shadow: var(--shadow);
+  display: flex; align-items: center; gap: 10px;
+}
+.bc-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.bc-dot.on  { background: var(--ok); }
+.bc-dot.off { background: var(--lgray); }
+.bc-dot.warn{ background: var(--warn); }
+.bc-label { font-size: 0.72rem; font-weight: 600; color: var(--text2); flex: 1; }
+.bc-val   { font-size: 0.78rem; font-weight: 800; color: var(--text); }
+
+/* ===== GROUP CARD ===== */
+.gc {
+  background: var(--card-bg);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.gc-header {
+  background: var(--blue);
+  padding: 10px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.gc-title { font-size: 0.85rem; font-weight: 800; color: #fff; }
+.gc-badge {
+  font-size: 0.65rem; font-weight: 700; padding: 2px 8px;
+  border-radius: 20px; background: rgba(255,255,255,0.15); color: #fff;
+}
+.gc-badge.ok   { background: rgba(34,197,94,0.3); }
+.gc-badge.warn { background: rgba(245,158,11,0.3); }
+.gc-body { padding: 12px 14px; }
+.gc-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--lgray);
+  font-size: 0.78rem;
+}
+.gc-row:last-child { border-bottom: none; }
+.gc-row-label { color: var(--text2); font-weight: 500; }
+.gc-row-val   { font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; }
+.gc-row-unit  { font-size: 0.65rem; color: var(--text2); font-weight: 400; }
+.dot-sm { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dot-sm.on   { background: var(--ok); }
+.dot-sm.off  { background: var(--lgray); }
+.dot-sm.warn { background: var(--warn); }
+
+/* ===== RAUM CARD ===== */
+.rc {
+  background: var(--card-bg);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.rc-header {
+  padding: 10px 14px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--lgray);
+}
+.rc-title { font-size: 0.85rem; font-weight: 800; color: var(--text); }
+.rc-sub   { font-size: 0.65rem; color: var(--text2); margin-top: 1px; }
+.rc-body  { padding: 10px 14px; }
+.rc-temps {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;
+}
+.rc-temp {
+  background: var(--bg);
+  border-radius: var(--r2);
+  padding: 9px 11px;
+}
+.rc-temp-label { font-size: 0.62rem; color: var(--text2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+.rc-temp-val   { font-size: 1.3rem; font-weight: 900; color: var(--text); line-height: 1.1; margin-top: 2px; }
+.rc-temp-unit  { font-size: 0.65rem; color: var(--text2); }
+.rc-status {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 0.75rem;
+}
+.rc-stoer { display: flex; align-items: center; gap: 5px; }
+.rc-schalter {
+  font-size: 0.7rem; font-weight: 700; padding: 3px 9px;
+  border-radius: 20px; background: var(--bg); color: var(--text2);
+}
+.rc-schalter.auto { background: rgba(0,147,190,0.12); color: var(--cyan); }
+.rc-schalter.hand { background: rgba(245,158,11,0.12); color: var(--warn); }
+.rc-schalter.aus  { background: var(--lgray); color: var(--text2); }
+
+/* ===== CHART ===== */
+.chart-card {
+  background: var(--card-bg);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.chart-title { font-size: 0.8rem; font-weight: 700; color: var(--text); margin-bottom: 12px; }
+.chart-wrap  { position: relative; height: 180px; }
+
+/* ===== STÖRMELDUNGEN ===== */
+.stoer-filter { display: flex; gap: 6px; margin-bottom: 12px; }
+.fbtn {
+  padding: 5px 13px; border-radius: 20px;
+  border: 1.5px solid var(--lgray);
+  background: var(--card-bg); color: var(--text2);
+  font-size: 0.72rem; font-weight: 600; cursor: pointer;
+  transition: all 0.15s;
+}
+.fbtn.active { background: var(--cyan); border-color: var(--cyan); color: #fff; }
+.stoer-list { display: flex; flex-direction: column; gap: 9px; }
+.sc {
+  background: var(--card-bg);
+  border-radius: var(--r2);
+  box-shadow: var(--shadow);
+  padding: 12px 13px;
+  border-left: 4px solid var(--warn);
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.sc.done { border-left-color: var(--ok); opacity: 0.65; }
+.sc.hidden { display: none; }
+.sc-pulse { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+.sc-pulse.warn { background: var(--warn); animation: py 1.5s infinite; }
+.sc-pulse.done { background: var(--ok); }
+.sc-body { flex: 1; }
+.sc-title { font-size: 0.82rem; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.sc-meta  { font-size: 0.68rem; color: var(--text2); }
+.sc-actions { display: flex; gap: 6px; margin-top: 8px; }
+.btn-q {
+  padding: 4px 11px; background: var(--warn); color: #fff;
+  border: none; border-radius: 5px; font-weight: 700; font-size: 0.72rem; cursor: pointer;
+}
+.sc-badge {
+  padding: 2px 8px; border-radius: 20px; font-size: 0.62rem; font-weight: 700;
+  flex-shrink: 0; align-self: flex-start;
+}
+.sc-badge.warn { background: #fef3c7; color: #92400e; }
+.sc-badge.done { background: #dcfce7; color: #166534; }
+
+/* ===== EINSTELLUNGEN ===== */
+.anlage-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.ai {
+  background: var(--card-bg);
+  border: 2px solid var(--lgray);
+  border-radius: var(--r2);
+  padding: 12px 10px; text-align: center;
+  cursor: pointer; transition: all 0.15s;
+}
+.ai.active { border-color: var(--cyan); background: rgba(0,147,190,0.07); }
+.ai:active { transform: scale(0.97); }
+.ai-icon { font-size: 1.4rem; margin-bottom: 4px; }
+.ai-name { font-size: 0.75rem; font-weight: 700; color: var(--text); }
+.ai-sub  { font-size: 0.62rem; color: var(--text2); margin-top: 1px; }
+.slist { display: flex; flex-direction: column; }
+.srow {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-bottom: 1px solid var(--lgray);
+  background: var(--card-bg);
+}
+.srow:first-child { border-radius: var(--r2) var(--r2) 0 0; }
+.srow:last-child  { border-bottom: none; border-radius: 0 0 var(--r2) var(--r2); }
+.srow-label { font-size: 0.82rem; font-weight: 600; color: var(--text); }
+.srow-sub   { font-size: 0.67rem; color: var(--text2); margin-top: 1px; }
+.srow-val   { font-size: 0.78rem; font-weight: 700; color: var(--text2); }
+.srow-val.cyan { color: var(--cyan); }
+.srow-val.ok   { color: var(--ok); }
+
+/* ===== MODAL ===== */
+.modal-ov {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 500;
+  align-items: center; justify-content: center; padding: 20px;
+}
+.modal-ov.open { display: flex; }
+.modal-box {
+  background: var(--card-bg); border-radius: var(--r);
+  max-width: 320px; width: 100%; padding: 20px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.25);
+  animation: fi 0.2s ease;
+}
+.modal-title { font-size: 0.95rem; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+.modal-text  { font-size: 0.8rem; color: var(--text2); margin-bottom: 16px; line-height: 1.6; }
+.modal-btns  { display: flex; gap: 8px; justify-content: flex-end; }
+.btn-cancel  { padding: 7px 14px; background: var(--lgray); color: var(--text); border: none; border-radius: 6px; font-weight: 700; font-size: 0.78rem; cursor: pointer; }
+.btn-confirm { padding: 7px 14px; background: var(--cyan); color: #fff; border: none; border-radius: 6px; font-weight: 700; font-size: 0.78rem; cursor: pointer; }
+
+/* ===== TOAST ===== */
+.toast-wrap {
+  position: fixed;
+  bottom: calc(var(--nav-h) + var(--safe) + 10px);
+  left: 12px; right: 12px;
+  z-index: 400; pointer-events: none;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.toast {
+  background: var(--blue); color: #fff;
+  padding: 10px 14px; border-radius: 9px;
+  font-size: 0.8rem; font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  animation: fi 0.25s ease;
+  display: flex; align-items: center; gap: 7px;
+}
+.toast.ok   { border-left: 3px solid var(--ok); }
+.toast.warn { border-left: 3px solid var(--warn); }
+
+/* ===== INSTALL BANNER ===== */
+.inst-banner {
+  display: none; position: fixed;
+  bottom: calc(var(--nav-h) + var(--safe) + 8px);
+  left: 10px; right: 10px;
+  background: var(--blue); color: #fff;
+  border-radius: 11px; padding: 12px 13px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+  z-index: 300;
+  flex-direction: row; align-items: center; gap: 10px;
+  animation: fi 0.3s ease;
+}
+.inst-banner.show { display: flex; }
+.inst-icon { font-size: 1.5rem; flex-shrink: 0; }
+.inst-text { flex: 1; }
+.inst-title { font-size: 0.82rem; font-weight: 800; }
+.inst-sub   { font-size: 0.65rem; opacity: 0.7; margin-top: 1px; }
+.inst-btn   { background: var(--cyan); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 700; font-size: 0.72rem; cursor: pointer; flex-shrink: 0; }
+.inst-close { background: none; border: none; color: rgba(255,255,255,0.5); font-size: 1rem; cursor: pointer; flex-shrink: 0; }
+
+/* ===== BOTTOM NAV ===== */
+.bnav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: calc(var(--nav-h) + var(--safe));
+  background: var(--card-bg);
+  border-top: 1px solid var(--lgray);
+  display: flex; align-items: flex-start;
+  padding-top: 5px;
+  z-index: 200;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.07);
+}
+.bnav-items { display: flex; width: 100%; }
+.ni {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  gap: 2px; padding: 4px 2px;
+  cursor: pointer; color: var(--text2);
+  font-size: 0.58rem; font-weight: 600;
+  transition: color 0.15s; position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+.ni.active { color: var(--cyan); }
+.ni-icon { font-size: 1.2rem; }
+.ni-badge {
+  position: absolute; top: 1px; right: calc(50% - 16px);
+  background: var(--danger); color: #fff;
+  border-radius: 10px; padding: 1px 4px;
+  font-size: 0.55rem; font-weight: 700;
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hdr-logo">
+    <img src="https://kreutztraeger-kaeltetechnik.de/wp-content/uploads/2022/02/kt-logo.png"
+         alt="Kreutzträger"
+         onerror="this.style.display='none'">
+    <div class="hdr-logo-txt">
+      <span class="b">Kreutzträger</span>
+      <span class="s">Kältetechnik</span>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="hdr-clock" id="clock">--:--:--</div>
+    <select class="hdr-select" id="anlageSelect" onchange="changeAnlage(this.value)">
+      <option>Bremen Werk 1</option>
+      <option>Hamburg Werk 2</option>
+      <option>Osnabrück Werk 3</option>
+      <option>Bergheim Werk 4</option>
+      <option>Flensburg Werk 5</option>
+    </select>
+    <button class="dark-btn" id="darkBtn" onclick="toggleDark()" title="Dark Mode"></button>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main class="main">
+
+<!-- ===== SEITE 1: ÜBERSICHT ===== -->
+<div class="page active" id="page-overview">
+
+  <!-- Status Banner -->
+  <div class="banner warn" id="mainBanner">
+    <div class="banner-dot warn" id="bannerDot"></div>
+    <div class="banner-text">
+      <div class="banner-title" id="bannerTitle">⚠️ 2 Warnmeldungen aktiv</div>
+      <div class="banner-sub" id="bannerSub">Bremen Werk 1 · NH₃-Kälteanlage · 2 Verdichter</div>
+    </div>
+    <div class="banner-val">
+      <div class="banner-val-num" id="bannerKW">--</div>
+      <div class="banner-val-lbl">kW elektrisch</div>
+    </div>
+  </div>
+
+  <!-- Kondensator -->
+  <div class="stitle">Kondensator</div>
+  <div class="grid2">
+    <div class="mc">
+      <div class="mc-label">SW Kondensationstemperatur</div>
+      <div class="mc-value" id="sw_kond_temp">--</div>
+      <div class="mc-unit">°C Sollwert</div>
+    </div>
+    <div class="mc">
+      <div class="mc-label">IW Kondensationstemperatur</div>
+      <div class="mc-value" id="iw_kond_temp">--</div>
+      <div class="mc-unit">°C Istwert</div>
+    </div>
+    <div class="mc">
+      <div class="mc-label">IW Kondensationsdruck</div>
+      <div class="mc-value" id="iw_kond_druck">--</div>
+      <div class="mc-unit">bar</div>
+    </div>
+    <div class="mc">
+      <div class="mc-label">IW Außentemperatur</div>
+      <div class="mc-value" id="iw_aussen">--</div>
+      <div class="mc-unit">°C</div>
+    </div>
+  </div>
+
+  <!-- Abscheider -->
+  <div class="stitle">Abscheider</div>
+  <div class="grid2">
+    <div class="bc" id="bc_nd_fuell">
+      <div class="bc-dot off" id="dot_nd_fuell"></div>
+      <div class="bc-label">ND-Abscheider Füllstand</div>
+      <div class="bc-val" id="val_nd_fuell">--</div>
+    </div>
+    <div class="bc" id="bc_md_fuell">
+      <div class="bc-dot off" id="dot_md_fuell"></div>
+      <div class="bc-label">MD-Abscheider Füllstand</div>
+      <div class="bc-val" id="val_md_fuell">--</div>
+    </div>
+  </div>
+
+  <!-- Verdichter LR -->
+  <div class="stitle">Verdichter – Leistungsregelung</div>
+  <div class="grid2">
+    <div class="mc">
+      <div class="mc-label">SW Verdampfungstemperatur</div>
+      <div class="mc-value" id="sw_verd_temp">--</div>
+      <div class="mc-unit">°C Sollwert</div>
+    </div>
+    <div class="mc">
+      <div class="mc-label">IW Verdampfungstemperatur</div>
+      <div class="mc-value" id="iw_verd_temp">--</div>
+      <div class="mc-unit">°C Istwert</div>
+    </div>
+  </div>
+
+  <!-- Anlage -->
+  <div class="stitle">Anlage</div>
+  <div class="grid2">
+    <div class="mc">
+      <div class="mc-label">IW Elektrische Leistung</div>
+      <div class="mc-value" id="iw_el_leis">--</div>
+      <div class="mc-unit">kW</div>
+    </div>
+    <div class="bc">
+      <div class="bc-dot warn" id="dot_stoer_prio"></div>
+      <div class="bc-label">Störung Prio 1</div>
+      <div class="bc-val" id="val_stoer_prio">--</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== SEITE 2: VERDICHTER ===== -->
+<div class="page" id="page-verdichter">
+
+  <!-- KV 1 -->
+  <div class="gc">
+    <div class="gc-header">
+      <div class="gc-title">⚙️ KV 1 – Kolbenverdichter 1</div>
+      <span class="gc-badge ok" id="kv1_badge">Betrieb</span>
+    </div>
+    <div class="gc-body">
+      <div class="grid2" style="margin-bottom:10px">
+        <div class="bc">
+          <div class="bc-dot" id="dot_kv1_betrieb"></div>
+          <div class="bc-label">Antrieb in Betrieb</div>
+          <div class="bc-val" id="val_kv1_betrieb">--</div>
+        </div>
+        <div class="bc">
+          <div class="bc-dot" id="dot_kv1_bereit"></div>
+          <div class="bc-label">Antrieb bereit</div>
+          <div class="bc-val" id="val_kv1_bereit">--</div>
+        </div>
+      </div>
+      <div class="gc-row">
+        <span class="gc-row-label">IW Leistung</span>
+        <span class="gc-row-val"><span id="iw_kv1_leis">--</span> <span class="gc-row-unit">%</span></span>
+      </div>
+      <div class="gc-row">
+        <span class="gc-row-label">IW Stromaufnahme</span>
+        <span class="gc-row-val"><span id="iw_kv1_strom">--</span> <span class="gc-row-unit">A</span></span>
+      </div>
+      <div class="gc-row">
+        <span class="gc-row-label">IW Betriebsstunden</span>
+        <span class="gc-row-val"><span id="iw_kv1_bh">--</span> <span class="gc-row-unit">Std</span></span>
+      </div>
+      <div class="gc-row">
+        <span class="gc-row-label">IW Saugdruck</span>
+        <span class="gc-row-val"><span id="iw_kv1_sd">--</span> <span class="gc-row-unit">bar</span></span>
+      </div>
+      <div class="gc-row">
+        <span class="gc-row-label">IW Enddruck</span>
+        <span class="gc-row-val"><span id="iw_kv1_ed">--</span> <span class="gc-row-unit">bar</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- KV 2 -->
+  <div class="gc">
+    <div class="gc-header">
+      <div class="gc-title">⚙️ KV 2 – Kolbenverdichter 2</div>
+      <span class="gc-badge ok" id="kv2_badge">Betrieb</span>
+    </div>
+    <div class="gc-body">
+      <div class="grid2" style="margin-bottom:10px">
+        <div class="bc">
+          <div class="bc-dot" id="dot_kv2_betrieb"></div>
+          <div class="bc-label">Antrieb in Betrieb</div>
+          <div class="bc-val" id="val_kv2_betrieb">--</div>
+        </div>
+        <div class="bc">
+          <div class="bc-dot" id="dot_kv2_bereit"></div>
+          <div class="bc-label">Antrieb bereit</div>
+          <div class="bc-val" id="val_kv2_bereit">--</div>
+        </div>
+      </div>
+      <div class="gc-row">
+        <span class="gc-row-label">IW Leistung</span>
+        <span class="gc-row-val"><span id="iw_kv2_leis">--</span> <span class="gc-row-unit">%</span></span>
+      </div>
+      <div class="gc-row">
+        <span class="gc-row-label">IW Stromaufnahme</span>
+        <span class="gc-row-val"><span id="iw_kv2_strom">--</span> <span class="gc-row-unit">A</span></span>
+      </div>
+      <div class="gc-row">
+        <span class="gc-row-label">IW Betriebsstunden</span>
+        <span class="gc-row-val"><span id="iw_kv2_bh">--</span> <span class="gc-row-unit">Std</span></span>
+      </div>
+      <div class="gc-row">
+        <span class="gc-row-label">IW Saugdruck</span>
+        <span class="gc-row-val"><span id="iw_kv2_sd">--</span> <span class="gc-row-unit">bar</span></span>
+      </div>
+      <div class="gc-row">
+        <span class="gc-row-label">IW Enddruck</span>
+        <span class="gc-row-val"><span id="iw_kv2_ed">--</span> <span class="gc-row-unit">bar</span></span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== SEITE 3: RÄUME ===== -->
+<div class="page" id="page-raeume">
+
+  <!-- Raum 1 -->
+  <div class="rc">
+    <div class="rc-header">
+      <div>
+        <div class="rc-title">🧊 Raum 1</div>
+        <div class="rc-sub">WAP TK – Tiefkühlbereich</div>
+      </div>
+      <span class="gc-badge ok" id="r1_badge">OK</span>
+    </div>
+    <div class="rc-body">
+      <div class="rc-temps">
+        <div class="rc-temp">
+          <div class="rc-temp-label">Sollwert</div>
+          <div class="rc-temp-val"><span id="sw_r1">--</span></div>
+          <div class="rc-temp-unit">°C</div>
+        </div>
+        <div class="rc-temp">
+          <div class="rc-temp-label">Istwert</div>
+          <div class="rc-temp-val"><span id="iw_r1">--</span></div>
+          <div class="rc-temp-unit">°C</div>
+        </div>
+      </div>
+      <div class="rc-status">
+        <div class="rc-stoer">
+          <div class="dot-sm" id="dot_r1_stoer"></div>
+          <span style="font-size:0.72rem;color:var(--text2)" id="val_r1_stoer">Keine Störung</span>
+        </div>
+        <div class="rc-schalter" id="schalter_r1">Auto</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Raum 2 -->
+  <div class="rc">
+    <div class="rc-header">
+      <div>
+        <div class="rc-title">🧊 Raum 2</div>
+        <div class="rc-sub">Komm TK – Kommissionierbereich</div>
+      </div>
+      <span class="gc-badge ok" id="r2_badge">OK</span>
+    </div>
+    <div class="rc-body">
+      <div class="rc-temps">
+        <div class="rc-temp">
+          <div class="rc-temp-label">Sollwert</div>
+          <div class="rc-temp-val"><span id="sw_r2">--</span></div>
+          <div class="rc-temp-unit">°C</div>
+        </div>
+        <div class="rc-temp">
+          <div class="rc-temp-label">Istwert</div>
+          <div class="rc-temp-val"><span id="iw_r2">--</span></div>
+          <div class="rc-temp-unit">°C</div>
+        </div>
+      </div>
+      <div class="rc-status">
+        <div class="rc-stoer">
+          <div class="dot-sm" id="dot_r2_stoer"></div>
+          <span style="font-size:0.72rem;color:var(--text2)" id="val_r2_stoer">Keine Störung</span>
+        </div>
+        <div class="rc-schalter" id="schalter_r2">Auto</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Raum 3 -->
+  <div class="rc">
+    <div class="rc-header">
+      <div>
+        <div class="rc-title">❄️ Raum 3</div>
+        <div class="rc-sub">WAP 2 +13°C – Kühlbereich</div>
+      </div>
+      <span class="gc-badge ok" id="r3_badge">OK</span>
+    </div>
+    <div class="rc-body">
+      <div class="rc-temps">
+        <div class="rc-temp">
+          <div class="rc-temp-label">Sollwert</div>
+          <div class="rc-temp-val"><span id="sw_r3">--</span></div>
+          <div class="rc-temp-unit">°C</div>
+        </div>
+        <div class="rc-temp">
+          <div class="rc-temp-label">Istwert</div>
+          <div class="rc-temp-val"><span id="iw_r3">--</span></div>
+          <div class="rc-temp-unit">°C</div>
+        </div>
+      </div>
+      <div class="rc-status">
+        <div class="rc-stoer">
+          <div class="dot-sm" id="dot_r3_stoer"></div>
+          <span style="font-size:0.72rem;color:var(--text2)" id="val_r3_stoer">Keine Störung</span>
+        </div>
+        <div class="rc-schalter" id="schalter_r3">Auto</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== SEITE 4: STÖRMELDUNGEN ===== -->
+<div class="page" id="page-stoer">
+  <div class="stoer-filter">
+    <button class="fbtn active" onclick="filterStoer('all',this)">Alle (4)</button>
+    <button class="fbtn" onclick="filterStoer('aktiv',this)">Aktiv (2)</button>
+    <button class="fbtn" onclick="filterStoer('done',this)">Erledigt (2)</button>
+  </div>
+  <div class="stoer-list" id="stoerList">
+    <div class="sc" id="st1" data-status="aktiv">
+      <div class="sc-pulse warn"></div>
+      <div class="sc-body">
+        <div class="sc-title">Störung Prio 1 – Anlage</div>
+        <div class="sc-meta">Adresse 112.0 · Bool · 1 = Störung liegt an</div>
+        <div class="sc-actions">
+          <button class="btn-q" onclick="showQuit('st1')">✓ Quittieren</button>
+        </div>
+      </div>
+      <span class="sc-badge warn">AKTIV</span>
+    </div>
+    <div class="sc" id="st2" data-status="aktiv">
+      <div class="sc-pulse warn"></div>
+      <div class="sc-body">
+        <div class="sc-title">Sammelstörung Raum 1</div>
+        <div class="sc-meta">Adresse 80.0 · Bool · 1 = Sammelstörung</div>
+        <div class="sc-actions">
+          <button class="btn-q" onclick="showQuit('st2')">✓ Quittieren</button>
+        </div>
+      </div>
+      <span class="sc-badge warn">AKTIV</span>
+    </div>
+    <div class="sc done" id="st3" data-status="done">
+      <div class="sc-pulse done"></div>
+      <div class="sc-body">
+        <div class="sc-title">ND-Abscheider Füllstand</div>
+        <div class="sc-meta">Adresse 16.0 · Bool · Quittiert: 28.05.2026 09:15</div>
+      </div>
+      <span class="sc-badge done">ERLEDIGT</span>
+    </div>
+    <div class="sc done" id="st4" data-status="done">
+      <div class="sc-pulse done"></div>
+      <div class="sc-body">
+        <div class="sc-title">Sammelstörung Raum 2</div>
+        <div class="sc-meta">Adresse 92.0 · Bool · Quittiert: 27.05.2026 14:30</div>
+      </div>
+      <span class="sc-badge done">ERLEDIGT</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SEITE 5: EINSTELLUNGEN ===== -->
+<div class="page" id="page-settings">
+  <div class="stitle">Anlage wählen</div>
+  <div class="anlage-grid">
+    <div class="ai active" onclick="selAnlage(this,'Bremen Werk 1')">
+      <div class="ai-icon">🏭</div>
+      <div class="ai-name">Bremen Werk 1</div>
+      <div class="ai-sub">Aktiv</div>
+    </div>
+    <div class="ai" onclick="selAnlage(this,'Hamburg Werk 2')">
+      <div class="ai-icon">🏭</div>
+      <div class="ai-name">Hamburg Werk 2</div>
+      <div class="ai-sub">Nebenanlage</div>
+    </div>
+    <div class="ai" onclick="selAnlage(this,'Osnabrück Werk 3')">
+      <div class="ai-icon">🏭</div>
+      <div class="ai-name">Osnabrück Werk 3</div>
+      <div class="ai-sub">Nebenanlage</div>
+    </div>
+    <div class="ai" onclick="selAnlage(this,'Bergheim Werk 4')">
+      <div class="ai-icon">🏭</div>
+      <div class="ai-name">Bergheim Werk 4</div>
+      <div class="ai-sub">Nebenanlage</div>
+    </div>
+  </div>
+
+  <div class="stitle">App-Einstellungen</div>
+  <div class="slist" style="border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)">
+    <div class="srow">
+      <div>
+        <div class="srow-label">🌙 Dark Mode</div>
+        <div class="srow-sub">Dunkles Design</div>
+      </div>
+      <button class="dark-btn" id="darkBtn2" onclick="toggleDark()"></button>
+    </div>
+    <div class="srow">
+      <div>
+        <div class="srow-label">🔔 Störmeldungen</div>
+        <div class="srow-sub">Push-Benachrichtigungen</div>
+      </div>
+      <span class="srow-val ok">AN</span>
+    </div>
+    <div class="srow">
+      <div>
+        <div class="srow-label">🔄 Auto-Refresh</div>
+        <div class="srow-sub">Datenaktualisierung</div>
+      </div>
+      <span class="srow-val">30s</span>
+    </div>
+    <div class="srow">
+      <div>
+        <div class="srow-label">⚙️ Service Worker</div>
+        <div class="srow-sub">PWA Offline-Fähigkeit</div>
+      </div>
+      <span class="srow-val" id="swStatus">Prüfe...</span>
+    </div>
+    <div class="srow">
+      <div>
+        <div class="srow-label">ℹ️ Version</div>
+        <div class="srow-sub">Kreutzträger Dashboard</div>
+      </div>
+      <span class="srow-val">2.1.0</span>
+    </div>
+    <div class="srow">
+      <div>
+        <div class="srow-label">📞 Support</div>
+        <div class="srow-sub">Kreutzträger Kältetechnik</div>
+      </div>
+      <span class="srow-val cyan">+49 421 43867-0</span>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- BOTTOM NAV -->
+<nav class="bnav">
+  <div class="bnav-items">
+    <div class="ni active" id="ni-overview" onclick="goPage('overview',this)">
+      <span class="ni-icon">📊</span>Übersicht
+    </div>
+    <div class="ni" id="ni-verdichter" onclick="goPage('verdichter',this)">
+      <span class="ni-icon">⚙️</span>Verdichter
+    </div>
+    <div class="ni" id="ni-raeume" onclick="goPage('raeume',this)">
+      <span class="ni-icon">🧊</span>Räume
+    </div>
+    <div class="ni" id="ni-stoer" onclick="goPage('stoer',this)">
+      <span class="ni-icon">🔔</span>Störungen
+      <span class="ni-badge" id="navBadge">2</span>
+    </div>
+    <div class="ni" id="ni-settings" onclick="goPage('settings',this)">
+      <span class="ni-icon">⚙️</span>Mehr
+    </div>
+  </div>
+</nav>
+
+<!-- MODAL -->
+<div class="modal-ov" id="modal" onclick="closeModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title">Meldung quittieren</div>
+    <div class="modal-text">Möchten Sie diese Störmeldung wirklich quittieren? Sie wird als erledigt markiert.</div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Abbrechen</button>
+      <button class="btn-confirm" onclick="doQuit()">✓ Quittieren</button>
+    </div>
+  </div>
+</div>
+
+<!-- INSTALL BANNER -->
+<div class="inst-banner" id="instBanner">
+  <div class="inst-icon">📱</div>
+  <div class="inst-text">
+    <div class="inst-title">App installieren</div>
+    <div class="inst-sub">Zum Homescreen – kein App Store nötig</div>
+  </div>
+  <button class="inst-btn" onclick="doInstall()">Installieren</button>
+  <button class="inst-close" onclick="dismissInst()">✕</button>
+</div>
+
+<!-- TOAST -->
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+'use strict';
+
+// ===== DEMO-DATEN (entsprechen der Datenpunktliste) =====
+var DATA = {
+  // Kondensator
+  sw_kond_temp:  35.0,
+  iw_kond_temp:  36.2,
+  iw_kond_druck: 14.8,
+  iw_aussen:     22.5,
+  // Abscheider
+  nd_fuell_ok:   true,
+  md_fuell_ok:   true,
+  // Verdichter LR
+  sw_verd_temp:  -8.0,
+  iw_verd_temp:  -8.4,
+  // KV1
+  kv1_betrieb:   true,
+  kv1_bereit:    true,
+  kv1_leistung:  78,
+  kv1_strom:     142,
+  kv1_bh:        12450,
+  kv1_sd:        2.84,
+  kv1_ed:        14.8,
+  // KV2
+  kv2_betrieb:   true,
+  kv2_bereit:    true,
+  kv2_leistung:  65,
+  kv2_strom:     118,
+  kv2_bh:        9320,
+  kv2_sd:        2.81,
+  kv2_ed:        14.7,
+  // Raum 1 (WAP TK)
+  sw_r1:         -22.0,
+  iw_r1:         -21.4,
+  r1_stoer:      false,
+  r1_schalter:   2,  // 0=Aus, 1=Hand, 2=Auto
+  // Raum 2 (Komm TK)
+  sw_r2:         -18.0,
+  iw_r2:         -17.8,
+  r2_stoer:      false,
+  r2_schalter:   2,
+  // Raum 3 (WAP 2 +13°C)
+  sw_r3:         13.0,
+  iw_r3:         13.5,
+  r3_stoer:      false,
+  r3_schalter:   2,
+  // Anlage
+  iw_el_leis:    214,
+  stoer_prio1:   true
+};
+
+// ===== UHRZEIT =====
+function tick() {
+  var n = new Date();
+  document.getElementById('clock').textContent =
+    pad(n.getHours()) + ':' + pad(n.getMinutes()) + ':' + pad(n.getSeconds());
+}
+function pad(x) { return String(x).padStart(2,'0'); }
+setInterval(tick, 1000);
+tick();
+
+// ===== DATEN RENDERN =====
+function renderData() {
+  var D = DATA;
+
+  // Kondensator
+  set('sw_kond_temp',  D.sw_kond_temp.toFixed(1));
+  set('iw_kond_temp',  D.iw_kond_temp.toFixed(1));
+  set('iw_kond_druck', D.iw_kond_druck.toFixed(1));
+  set('iw_aussen',     D.iw_aussen.toFixed(1));
+
+  // Abscheider
+  setBool('dot_nd_fuell', 'val_nd_fuell', D.nd_fuell_ok, 'OK', 'Fehler');
+  setBool('dot_md_fuell', 'val_md_fuell', D.md_fuell_ok, 'OK', 'Fehler');
+
+  // LR
+  set('sw_verd_temp', D.sw_verd_temp.toFixed(1));
+  set('iw_verd_temp', D.iw_verd_temp.toFixed(1));
+
+  // KV1
+  setBool('dot_kv1_betrieb', 'val_kv1_betrieb', D.kv1_betrieb, 'Ja', 'Nein');
+  setBool('dot_kv1_bereit',  'val_kv1_bereit',  D.kv1_bereit,  'Ja', 'Nein');
+  set('iw_kv1_leis',  D.kv1_leistung);
+  set('iw_kv1_strom', D.kv1_strom);
+  set('iw_kv1_bh',    D.kv1_bh.toLocaleString('de-DE'));
+  set('iw_kv1_sd',    D.kv1_sd.toFixed(2));
+  set('iw_kv1_ed',    D.kv1_ed.toFixed(1));
+  setBadge('kv1_badge', D.kv1_betrieb, 'Betrieb', 'Aus');
+
+  // KV2
+  setBool('dot_kv2_betrieb', 'val_kv2_betrieb', D.kv2_betrieb, 'Ja', 'Nein');
+  setBool('dot_kv2_bereit',  'val_kv2_bereit',  D.kv2_bereit,  'Ja', 'Nein');
+  set('iw_kv2_leis',  D.kv2_leistung);
+  set('iw_kv2_strom', D.kv2_strom);
+  set('iw_kv2_bh',    D.kv2_bh.toLocaleString('de-DE'));
+  set('iw_kv2_sd',    D.kv2_sd.toFixed(2));
+  set('iw_kv2_ed',    D.kv2_ed.toFixed(1));
+  setBadge('kv2_badge', D.kv2_betrieb, 'Betrieb', 'Aus');
+
+  // Räume
+  setRaum(1, D.sw_r1, D.iw_r1, D.r1_stoer, D.r1_schalter);
+  setRaum(2, D.sw_r2, D.iw_r2, D.r2_stoer, D.r2_schalter);
+  setRaum(3, D.sw_r3, D.iw_r3, D.r3_stoer, D.r3_schalter);
+
+  // Anlage
+  set('iw_el_leis', D.iw_el_leis);
+  set('bannerKW',   D.iw_el_leis);
+  setBool('dot_stoer_prio', 'val_stoer_prio', !D.stoer_prio1, 'Keine Störung', 'STÖRUNG!');
+
+  // Banner
+  var aktiv = document.querySelectorAll('.sc[data-status="aktiv"]').length;
+  var banner = document.getElementById('mainBanner');
+  var dot    = document.getElementById('bannerDot');
+  var title  = document.getElementById('bannerTitle');
+  if (aktiv === 0) {
+    banner.className = 'banner ok';
+    dot.className    = 'banner-dot ok';
+    title.textContent = '✅ Alle Systeme OK';
+  } else {
+    banner.className = 'banner warn';
+    dot.className    = 'banner-dot warn';
+    title.textContent = '⚠️ ' + aktiv + ' Warnmeldung' + (aktiv > 1 ? 'en' : '') + ' aktiv';
+  }
+}
+
+function set(id, val) {
+  var el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function setBool(dotId, valId, state, trueText, falseText) {
+  var dot = document.getElementById(dotId);
+  var val = document.getElementById(valId);
+  if (dot) { dot.className = 'bc-dot ' + (state ? 'on' : 'off'); }
+  if (val) val.textContent = state ? trueText : falseText;
+}
+
+function setBadge(id, state, trueText, falseText) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = state ? trueText : falseText;
+  el.className   = 'gc-badge ' + (state ? 'ok' : 'warn');
+}
+
+function setRaum(n, sw, iw, stoer, schalter) {
+  set('sw_r' + n, sw.toFixed(1));
+  set('iw_r' + n, iw.toFixed(1));
+
+  var dot = document.getElementById('dot_r' + n + '_stoer');
+  var val = document.getElementById('val_r' + n + '_stoer');
+  var badge = document.getElementById('r' + n + '_badge');
+  var sch   = document.getElementById('schalter_r' + n);
+
+  if (dot) dot.className = 'dot-sm ' + (stoer ? 'warn' : 'on');
+  if (val) val.textContent = stoer ? 'Sammelstörung!' : 'Keine Störung';
+  if (badge) {
+    badge.textContent = stoer ? 'Störung' : 'OK';
+    badge.className   = 'gc-badge ' + (stoer ? 'warn' : 'ok');
+  }
+  if (sch) {
+    var labels = ['Aus', 'Hand', 'Auto'];
+    var classes = ['aus', 'hand', 'auto'];
+    sch.textContent = labels[schalter] || 'Auto';
+    sch.className   = 'rc-schalter ' + (classes[schalter] || 'auto');
+  }
+}
+
+// ===== NAVIGATION =====
+function goPage(id, btn) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.ni').forEach(function(n) { n.classList.remove('active'); });
+  document.getElementById('page-' + id).classList.add('active');
+  if (btn) btn.classList.add('active');
+  var nb = document.getElementById('ni-' + id);
+  if (nb) nb.classList.add('active');
+}
+
+// ===== DARK MODE =====
+var dark = false;
+function toggleDark() {
+  dark = !dark;
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  document.getElementById('darkBtn').classList.toggle('on', dark);
+  var db2 = document.getElementById('darkBtn2');
+  if (db2) db2.classList.toggle('on', dark);
+  showToast(dark ? '🌙 Dark Mode an' : '☀️ Light Mode an', 'ok');
+}
+
+// ===== ANLAGE =====
+function changeAnlage(v) {
+  document.getElementById('bannerSub').textContent = v + ' · NH₃-Kälteanlage · 2 Verdichter';
+  showToast('🏭 ' + v, 'ok');
+}
+function selAnlage(el, name) {
+  document.querySelectorAll('.ai').forEach(function(c) { c.classList.remove('active'); });
+  el.classList.add('active');
+  document.getElementById('anlageSelect').value = name;
+  changeAnlage(name);
+}
+
+// ===== STÖRMELDUNGEN =====
+function filterStoer(type, btn) {
+  document.querySelectorAll('.stoer-filter .fbtn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  document.querySelectorAll('.sc').forEach(function(c) {
+    var s = c.getAttribute('data-status');
+    c.classList.toggle('hidden', type !== 'all' && s !== type);
+  });
+}
+
+var quitTarget = null;
+function showQuit(id) { quitTarget = id; document.getElementById('modal').classList.add('open'); }
+function closeModal() { document.getElementById('modal').classList.remove('open'); quitTarget = null; }
+function doQuit() {
+  if (!quitTarget) return;
+  var card = document.getElementById(quitTarget);
+  card.setAttribute('data-status', 'done');
+  card.classList.add('done');
+  card.querySelector('.sc-pulse').className = 'sc-pulse done';
+  card.querySelector('.sc-badge').className = 'sc-badge done';
+  card.querySelector('.sc-badge').textContent = 'ERLEDIGT';
+  var acts = card.querySelector('.sc-actions');
+  if (acts) acts.remove();
+  closeModal();
+  updateBadge();
+  showToast('✅ Meldung quittiert', 'ok');
+}
+function updateBadge() {
+  var n = document.querySelectorAll('.sc[data-status="aktiv"]').length;
+  var badge = document.getElementById('navBadge');
+  badge.textContent = n;
+  badge.style.display = n === 0 ? 'none' : '';
+  renderData();
+}
+
+// ===== TOAST =====
+function showToast(msg, type) {
+  var wrap = document.getElementById('toastWrap');
+  var t = document.createElement('div');
+  t.className = 'toast ' + (type || 'ok');
+  t.textContent = msg;
+  wrap.appendChild(t);
+  setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 2800);
+}
+
+// ===== ESC =====
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
+
+// ===== PWA: SERVICE WORKER =====
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('./service-worker.js')
+      .then(function(reg) {
+        var el = document.getElementById('swStatus');
+        if (el) { el.textContent = 'Aktiv ✓'; el.className = 'srow-val ok'; }
+        reg.addEventListener('updatefound', function() {
+          var nw = reg.installing;
+          nw.addEventListener('statechange', function() {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+              showToast('🔄 Update verfügbar – Seite neu laden', 'ok');
+            }
+          });
+        });
+      })
+      .catch(function() {
+        var el = document.getElementById('swStatus');
+        if (el) el.textContent = 'Nicht verfügbar';
+      });
+  });
+}
+
+// ===== PWA: INSTALL =====
+var deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault();
+  deferredPrompt = e;
+  setTimeout(function() {
+    if (!localStorage.getItem('kt_dismissed')) {
+      document.getElementById('instBanner').classList.add('show');
+    }
+  }, 2500);
+});
+function doInstall() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(function(r) {
+    if (r.outcome === 'accepted') showToast('✅ App wird installiert!', 'ok');
+    deferredPrompt = null;
+    document.getElementById('instBanner').classList.remove('show');
+  });
+}
+function dismissInst() {
+  document.getElementById('instBanner').classList.remove('show');
+  localStorage.setItem('kt_dismissed', '1');
+}
+window.addEventListener('appinstalled', function() {
+  showToast('✅ App installiert!', 'ok');
+  document.getElementById('instBanner').classList.remove('show');
+});
+
+// ===== INIT =====
+renderData();
+
+// Simuliere leichte Datenschwankungen für Demo
+setInterval(function() {
+  DATA.iw_kond_temp  += (Math.random() - 0.5) * 0.2;
+  DATA.iw_verd_temp  += (Math.random() - 0.5) * 0.1;
+  DATA.iw_kond_druck += (Math.random() - 0.5) * 0.05;
+  DATA.iw_r1         += (Math.random() - 0.5) * 0.1;
+  DATA.iw_r2         += (Math.random() - 0.5) * 0.1;
+  DATA.iw_r3         += (Math.random() - 0.5) * 0.1;
+  DATA.kv1_strom     += Math.round((Math.random() - 0.5) * 2);
+  DATA.kv2_strom     += Math.round((Math.random() - 0.5) * 2);
+  renderData();
+}, 5000);
+</script>
+</body>
+</html>
